@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import streamlit as st
+import pydeck as pdk
 from bertopic import BERTopic
 from sklearn.preprocessing import normalize
 
@@ -15,7 +16,7 @@ def load_stuff():
         calculate_probabilities=True,
     ).load("mond45/panda")
     embeddings = np.load("embedding.npy")
-
+    cleaned = pd.read_json("cleaned2.json")
     df = pd.read_json("cleaned.json")
     df_scraped = pd.read_json("scrap_data.json")
     df_scraped_dates = (
@@ -59,11 +60,10 @@ def load_stuff():
         df_all["year"].astype(str) + df_all["month"].astype(str), format="%Y%m"
     )
 
-    return topic_model, embeddings, df_all
+    return topic_model, embeddings, df_all, cleaned
 
 
-topic_model, embeddings, df_all = load_stuff()
-
+topic_model, embeddings, df_all, cleaned = load_stuff()
 
 @st.cache_data
 def get_topics_over_time():
@@ -85,6 +85,8 @@ st.write(topic_model.visualize_hierarchy(top_n_topics=50))
 
 st.write("## Topic Over Time")
 st.write(topic_model.visualize_topics_over_time(get_topics_over_time()))
+
+
 
 
 def extract(row):
@@ -170,3 +172,24 @@ st.write(
     )
 )
 
+st.write("## Topic Distribution")
+
+df_coord = pd.read_json("coord.json")
+
+
+def create_map(dataframe, opacity):
+    layer = pdk.Layer(
+        "HeatmapLayer",
+        dataframe,
+        get_position=["Longitude", "Latitude"],
+        opacity=opacity,
+        pickable=True,
+    )
+
+    return pdk.Deck(layers=[layer])
+
+
+all_subjects = df_coord["classification"].explode().unique()
+subject = st.selectbox("Select a subject", all_subjects)
+df_selected = df_coord[df_coord["classification"].map(lambda x: subject in x)]
+st.write(create_map(df_coord, 0.5))
